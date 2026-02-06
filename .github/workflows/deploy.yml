@@ -15,10 +15,10 @@ jobs:
   build-and-push:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
-    
+
     outputs:
       image-tag: ${{ github.sha }}
-    
+
     permissions:
       contents: read
       packages: write
@@ -55,7 +55,7 @@ jobs:
     name: Deploy to OpenShift
     needs: build-and-push
     runs-on: ubuntu-latest
-    
+
     permissions:
       contents: read
 
@@ -95,8 +95,6 @@ jobs:
         run: |
           cd k8s-manifests/apps/task-api/base
           kustomize edit set image task-api=${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image-tag }}
-          kustomize build . > deployment.yaml
-          cat deployment.yaml
 
       - name: Deploy application
         run: |
