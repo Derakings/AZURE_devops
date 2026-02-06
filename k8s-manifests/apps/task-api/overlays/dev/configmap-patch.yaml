@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: task-api-config
+data:
+  debug: "true"
+  log-level: "DEBUG"
