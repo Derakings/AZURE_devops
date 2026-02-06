@@ -9,7 +9,7 @@ resources:
   - configmap.yaml
   - secret.yaml
 
-labels:
+commonLabels:
   app: task-api
 
 images:
