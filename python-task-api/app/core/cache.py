@@ -1,6 +1,7 @@
 """
 Redis caching utilities
 """
+
 import json
 from typing import Optional, Any
 import redis.asyncio as redis
@@ -15,9 +16,7 @@ async def get_redis() -> redis.Redis:
     global redis_client
     if redis_client is None:
         redis_client = await redis.from_url(
-            settings.REDIS_URL,
-            encoding="utf-8",
-            decode_responses=True
+            settings.REDIS_URL, encoding="utf-8", decode_responses=True
         )
     return redis_client
 

@@ -2,6 +2,7 @@
 FastAPI Task Management API
 Production-ready microservice with PostgreSQL, Redis, and JWT authentication
 """
+
 from datetime import datetime
 from contextlib import asynccontextmanager
 
@@ -19,14 +20,9 @@ from app.schemas.schemas import HealthCheck
 
 # Prometheus metrics
 REQUEST_COUNT = Counter(
-    'http_requests_total', 
-    'Total HTTP requests',
-    ['method', 'endpoint', 'status']
+    "http_requests_total", "Total HTTP requests", ["method", "endpoint", "status"]
 )
-REQUEST_DURATION = Histogram(
-    'http_request_duration_seconds',
-    'HTTP request duration'
-)
+REQUEST_DURATION = Histogram("http_request_duration_seconds", "HTTP request duration")
 
 
 @asynccontextmanager
@@ -34,17 +30,17 @@ async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
     print("🚀 Starting Task Management API...")
-    
+
     # Create database tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
+
     print("✅ Database tables created")
     print(f"📡 API available at http://localhost:8000")
     print(f"📚 Documentation at http://localhost:8000/docs")
-    
+
     yield
-    
+
     # Shutdown
     print("🛑 Shutting down...")
     await close_redis()
@@ -59,7 +55,7 @@ app = FastAPI(
     description="Production-ready Task Management API with FastAPI, PostgreSQL, and Redis",
     docs_url="/docs",
     redoc_url="/redoc",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # CORS middleware
@@ -84,7 +80,7 @@ async def health_check():
     return {
         "status": "healthy",
         "version": settings.APP_VERSION,
-        "timestamp": datetime.utcnow()
+        "timestamp": datetime.utcnow(),
     }
 
 
@@ -98,10 +94,9 @@ async def readiness_check():
             await conn.execute("SELECT 1")
     except Exception as e:
         return JSONResponse(
-            status_code=503,
-            content={"status": "not ready", "error": str(e)}
+            status_code=503, content={"status": "not ready", "error": str(e)}
         )
-    
+
     return {"status": "ready"}
 
 
@@ -116,10 +111,7 @@ async def liveness_check():
 @app.get("/metrics", tags=["monitoring"])
 async def metrics():
     """Prometheus metrics endpoint"""
-    return Response(
-        content=generate_latest(),
-        media_type=CONTENT_TYPE_LATEST
-    )
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 # Root endpoint
@@ -130,15 +122,11 @@ async def root():
         "message": "Task Management API",
         "version": settings.APP_VERSION,
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
     }
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
-    )
+
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
