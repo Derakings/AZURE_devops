@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from fastapi import Response
+from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.database import engine, Base
@@ -91,7 +92,7 @@ async def readiness_check():
     # Check database connection
     try:
         async with engine.connect() as conn:
-            await conn.execute("SELECT 1")
+            await conn.execute(text("SELECT 1"))
     except Exception as e:
         return JSONResponse(
             status_code=503, content={"status": "not ready", "error": str(e)}
