@@ -1,0 +1,132 @@
+name: $(Date:yyyyMMdd)$(Rev:.r)
+
+trigger:
+  branches:
+    include:
+      - main
+
+pr: none # Don't trigger on PRs (GitHub Actions handles that)
+
+pool:
+  vmImage: "ubuntu-latest"
+
+variables:
+  dockerRegistry: "docker.io"
+  dockerUsername: "$(DOCKERHUB_USERNAME)"
+  imageRepository: "task-api"
+  namespace: "derakings-dev"
+  pythonVersion: "3.11"
+
+stages:
+  - stage: Build
+    displayName: "Build and Test"
+    jobs:
+      - job: TestAndBuild
+        displayName: "Run Tests & Build Docker Image"
+        steps:
+          - task: UsePythonVersion@0
+            displayName: "Use Python $(pythonVersion)"
+            inputs:
+              versionSpec: "$(pythonVersion)"
+
+          - script: |
+              cd python-task-api
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+              pip install pytest pytest-cov
+            displayName: "Install dependencies"
+
+          - script: |
+              cd python-task-api
+              pytest --cov=app --cov-report=xml --cov-report=html
+            displayName: "Run unit tests"
+            continueOnError: false
+
+          - task: PublishTestResults@2
+            displayName: "Publish test results"
+            inputs:
+              testResultsFiles: "**/test-*.xml"
+              testRunTitle: "Python $(pythonVersion)"
+            condition: succeededOrFailed()
+
+          - task: PublishCodeCoverageResults@1
+            displayName: "Publish coverage results"
+            inputs:
+              codeCoverageTool: Cobertura
+              summaryFileLocation: "$(System.DefaultWorkingDirectory)/python-task-api/coverage.xml"
+            condition: succeededOrFailed()
+
+          - task: Docker@2
+            displayName: "Build Docker image"
+            inputs:
+              command: "build"
+              repository: "$(dockerUsername)/$(imageRepository)"
+              dockerfile: "python-task-api/Dockerfile"
+              buildContext: "python-task-api"
+              tags: |
+                $(Build.BuildId)
+                latest
+
+          - task: Docker@2
+            displayName: "Push to Docker Hub"
+            inputs:
+              command: "push"
+              repository: "$(dockerUsername)/$(imageRepository)"
+              containerRegistry: "dockerhub-connection"
+              tags: |
+                $(Build.BuildId)
+                latest
+
+  - stage: Deploy
+    displayName: "Deploy to OpenShift"
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - deployment: DeployOpenShift
+        displayName: "Deploy to derakings-dev"
+        environment: "openshift-dev"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - script: |
+                    # Install oc CLI
+                    curl -LO https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz
+                    tar -xvf openshift-client-linux.tar.gz
+                    sudo mv oc /usr/local/bin/
+                    oc version --client
+                  displayName: "Install OpenShift CLI"
+
+                - script: |
+                    # Login to OpenShift
+                    oc login --token=$(OPENSHIFT_TOKEN) --server=$(OPENSHIFT_SERVER)
+                    oc project $(namespace)
+                  displayName: "Login to OpenShift"
+
+                - script: |
+                    # Update image in kustomization
+                    cd k8s-manifests/apps/task-api/base
+                    kustomize edit set image task-api=$(dockerUsername)/$(imageRepository):$(Build.BuildId)
+                  displayName: "Update image tag"
+
+                - script: |
+                    # Deploy using kustomize
+                    oc apply -k k8s-manifests/apps/task-api/base -n $(namespace)
+                  displayName: "Deploy to OpenShift"
+
+                - script: |
+                    # Wait for rollout
+                    oc rollout status deployment/task-api -n $(namespace) --timeout=5m
+                  displayName: "Wait for deployment"
+
+                - script: |
+                    # Get application URL
+                    echo "=== Deployment Info ==="
+                    oc get deployment task-api -n $(namespace)
+                    oc get pods -n $(namespace) | grep task-api
+                    APP_URL=$(oc get route task-api -n $(namespace) -o jsonpath='{.spec.host}' 2>/dev/null || echo "Not available")
+                    echo "Application URL: https://$APP_URL"
+                    echo "Swagger Docs: https://$APP_URL/docs"
+                  displayName: "Deployment summary"

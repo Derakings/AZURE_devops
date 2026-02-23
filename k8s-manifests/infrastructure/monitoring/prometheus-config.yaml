@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: derakings-dev
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'openshift-dev'
+        namespace: 'derakings-dev'
+
+    scrape_configs:
+      # Prometheus itself
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+            labels:
+              service: 'prometheus'
+
+      # Your FastAPI application (2 replicas)
+      - job_name: 'task-api'
+        metrics_path: '/metrics'
+        static_configs:
+          - targets: ['task-api:8000']
+            labels:
+              service: 'task-api'
+              environment: 'dev'
+
+      # PostgreSQL (needs postgres_exporter)
+      - job_name: 'postgres'
+        static_configs:
+          - targets: ['postgres:9187']
+            labels:
+              service: 'postgres'
+      
+      # Redis (needs redis_exporter)
+      - job_name: 'redis'
+        static_configs:
+          - targets: ['redis:9121']
+            labels:
+              service: 'redis'
+      
+      # Kubernetes pods (automatic discovery)
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - derakings-dev
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__

@@ -300,6 +300,18 @@ GitHub Actions • Docker • Docker Hub • Kubernetes • OpenShift • Python
 - **Uptime Target**: 99% (with health checks)
 
 ---
+## CI/CD Strategy
+
+### GitHub Actions (PR Validation)
+- **Trigger:** Pull requests to main/develop
+- **Actions:** Run tests, linting, type checking, code coverage
+- **Purpose:** Ensure code quality before merge
+
+### Azure DevOps (Production Deployment)
+- **Trigger:** Push to main branch
+- **Actions:** Build Docker image, push to registry, deploy to OpenShift
+- **Purpose:** Automated production deployment
+
 
 ## 🎓 Skills Demonstrated
 
